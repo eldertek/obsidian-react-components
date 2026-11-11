@@ -81,7 +81,11 @@ export function getLivePostprocessor() {
                     syntaxTree(view.state).iterate({
                         from,
                         to,
-                        enter: (type, from, to) => {
+                        enter: (nodeOrType: any, maybeFrom?: number, maybeTo?: number) => {
+                            const node = typeof maybeFrom === 'number' ? null : nodeOrType;
+                            const type = node ? node.type : nodeOrType;
+                            const enterFrom = node ? node.from : maybeFrom!;
+                            const enterTo = node ? node.to : maybeTo!;
                             const tokens = type.prop(tokenClassNodeProp);
                             const props = new Set(tokens?.split(' '));
                             const propNames = new Set(
@@ -99,37 +103,37 @@ export function getLivePostprocessor() {
                                     strippedCodeblockHeader.startsWith('jsx-') ||
                                     strippedCodeblockHeader == 'jsx'
                                 ) {
-                                    codeblockStart = { from, to, strippedCodeblockHeader };
+                                    codeblockStart = { from: enterFrom, to: enterTo, strippedCodeblockHeader };
                                 }
                                 return;
                             }
                             if (propNames.has('HyperMD-codeblock-end') && codeblockStart) {
-                                const code = view.state.doc.sliceString(codeblockStart.to, from)?.trim();
+                                const code = view.state.doc.sliceString(codeblockStart.to, enterFrom)?.trim();
                                 if (
                                     codeblockStart.strippedCodeblockHeader == 'jsx:' ||
                                     codeblockStart.strippedCodeblockHeader == 'jsx-'
                                 ) {
-                                    createJsxDecoration(code, codeblockStart.from, to, true);
+                                    createJsxDecoration(code, codeblockStart.from, enterTo, true);
                                 } else if (codeblockStart.strippedCodeblockHeader.startsWith('jsx::')) {
                                     const componentName = codeblockStart.strippedCodeblockHeader
                                         .substr('jsx::'.length)
                                         .trim();
                                     const source = `<${componentName} src={${JSON.stringify(code)}}/>`;
-                                    createJsxDecoration(source, codeblockStart.from, to, true);
+                                    createJsxDecoration(source, codeblockStart.from, enterTo, true);
                                 } else if (codeblockStart.strippedCodeblockHeader.startsWith('jsx')) {
                                     const source = `<Markdown src={${JSON.stringify('```tsx\n' + code + '\n```')}}/>`;
-                                    createJsxDecoration(source, codeblockStart.from, to, true);
+                                    createJsxDecoration(source, codeblockStart.from, enterTo, true);
                                 }
                                 codeblockStart = null;
                             }
                             if (!props.has('inline-code')) return;
                             if (props.has('formatting')) return;
-                            const line = view.state.doc.sliceString(from, to);
+                            const line = view.state.doc.sliceString(enterFrom, enterTo);
                             if (!/^jsx:/.test(line)) return;
 
                             const [, code] = line.match(/^jsx:\s?(.+)/) ?? [];
                             if (!code?.trim().length) return;
-                            createJsxDecoration(code, from, to);
+                            createJsxDecoration(code, enterFrom, enterTo);
                         }
                     });
                 }

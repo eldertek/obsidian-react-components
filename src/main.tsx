@@ -56,7 +56,10 @@ export default class ReactComponentsPlugin extends Plugin {
     async loadComponents() {
         try {
             await awaitFilesLoaded();
-            for (const file of ReactComponentsPlugin.instance.app.vault.getMarkdownFiles()) {
+            const files = ReactComponentsPlugin.instance.app.vault
+                .getFiles()
+                .filter(f => ['md', 'jsx', 'tsx'].includes(f.extension));
+            for (const file of files) {
                 await registerComponents(file, true);
             }
             await refreshComponentScope();
@@ -73,13 +76,16 @@ export default class ReactComponentsPlugin extends Plugin {
 
         await setupComponentRendering();
 
-        const registerIfCodeBlockFile = file => {
+        const registerIfCodeBlockFile = (file: unknown) => {
+            if (!(file instanceof TFile)) return;
+            const ext = file.extension?.toLowerCase();
+            if (ext !== 'md' && ext !== 'jsx' && ext !== 'tsx') return;
+            const parentPath = file.parent ? normalizePath(file.parent.path) : '';
+            const templateFolder = this.settings.template_folder ? normalizePath(this.settings.template_folder) : '';
             if (
-                file instanceof TFile &&
-                ((this.settings.template_folder != '' &&
-                    file.parent.path.startsWith(normalizePath(this.settings.template_folder))) ||
-                    this.settings.all_files_define_components ||
-                    getPropertyValue('defines-react-components', file))
+                (templateFolder !== '' && parentPath.startsWith(templateFolder)) ||
+                this.settings.all_files_define_components ||
+                getPropertyValue('defines-react-components', file)
             ) {
                 registerComponents(file);
             }
